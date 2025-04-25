@@ -22,14 +22,13 @@ use cf_chains::{
 	mocks::{MockEthereum, MockEthereumChainCrypto},
 	ApiCall, ChainCrypto, Ethereum, UpdateFlipSupply,
 };
+use pallet_cf_flip::ScalingConfig;
 use cf_primitives::FlipBalance;
 use cf_traits::{
-	impl_mock_chainflip, impl_mock_runtime_safe_mode, impl_mock_waived_fees,
-	mocks::{
+	impl_mock_chainflip, impl_mock_runtime_safe_mode, impl_mock_waived_fees, mocks::{
 		broadcaster::MockBroadcaster, egress_handler::MockEgressHandler,
 		flip_burn_info::MockFlipBurnInfo,
-	},
-	Issuance, RewardsDistribution, WaivedFees,
+	}, Issuance, NoFeeScaling, RewardsDistribution, WaivedFees
 };
 use codec::{Decode, Encode, MaxEncodedLen};
 use frame_support::{derive_impl, parameter_types, traits::Imbalance};
@@ -43,6 +42,7 @@ pub const FLIP_TO_BURN: u128 = 10_000;
 pub const SUPPLY_UPDATE_INTERVAL: u32 = 10;
 pub const TOTAL_ISSUANCE: u128 = 1_000_000_000;
 pub const DAILY_SLASHING_RATE: Permill = Permill::from_perthousand(1);
+pub const SCALING_CONFIG: ScalingConfig = ScalingConfig::DelayedExponential{count: 3, base: 1};
 
 cf_traits::impl_mock_on_account_funded!(AccountId, u128);
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -81,6 +81,7 @@ impl pallet_cf_flip::Config for Test {
 	type OnAccountFunded = MockOnAccountFunded;
 	type WeightInfo = ();
 	type WaivedFees = WaivedFeesMock;
+	type ScalableFeeManager = NoFeeScaling;
 }
 
 pub const EMISSION_RATE: u128 = 10;
@@ -177,7 +178,7 @@ cf_test_utilities::impl_test_helpers! {
 	Test,
 	RuntimeGenesisConfig {
 		system: Default::default(),
-		flip: FlipConfig { total_issuance: TOTAL_ISSUANCE, daily_slashing_rate: DAILY_SLASHING_RATE },
+		flip: FlipConfig { total_issuance: TOTAL_ISSUANCE, daily_slashing_rate: DAILY_SLASHING_RATE, scaling_config: SCALING_CONFIG},
 		emissions: {
 			EmissionsConfig {
 				current_authority_emission_inflation: 2720,

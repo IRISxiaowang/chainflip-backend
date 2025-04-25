@@ -73,6 +73,7 @@ frame-executive = { workspace = true, default-features = true }
 frame-support = { workspace = true, default-features = true }
 frame-system = { workspace = true, default-features = true }
 frame-system-rpc-runtime-api = { workspace = true, default-features = true }
+frame-metadata-hash-extension = { workspace = true, default-features = true }
 
 pallet-aura = { workspace = true, default-features = true }
 pallet-grandpa = { workspace = true, default-features = true }
@@ -92,3 +93,4 @@ sp-transaction-pool = { workspace = true, default-features = true }
 sp-version = { workspace = true, default-features = true }
 sp-consensus-grandpa = { workspace = true, default-features = true }
 sp-timestamp = { workspace = true, default-features = true }
+sp-keyring = { workspace = true, default-features = true }

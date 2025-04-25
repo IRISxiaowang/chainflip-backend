@@ -24,6 +24,7 @@ cf-traits = { workspace = true }
 # Parity deps
 codec = { workspace = true, features = ["derive"] }
 scale-info = { workspace = true, features = ["derive"] }
+serde = { workspace = true, features = ["derive"] }
 
 frame-benchmarking = { workspace = true, optional = true }
 frame-support = { workspace = true }

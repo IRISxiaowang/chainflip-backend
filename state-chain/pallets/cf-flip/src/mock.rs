@@ -18,7 +18,7 @@
 
 use crate::{self as pallet_cf_flip, BurnFlipAccount};
 use cf_primitives::FlipBalance;
-use cf_traits::{impl_mock_chainflip, impl_mock_waived_fees, Funding, WaivedFees};
+use cf_traits::{impl_mock_chainflip, impl_mock_waived_fees, Funding, NoFeeScaling, WaivedFees};
 use frame_support::{
 	derive_impl, parameter_types,
 	traits::{ConstU128, ConstU8, HandleLifetime},
@@ -68,6 +68,7 @@ impl pallet_cf_flip::Config for Test {
 	type OnAccountFunded = MockOnAccountFunded;
 	type WeightInfo = ();
 	type WaivedFees = WaivedFeesMock;
+	type ScalableFeeManager = NoFeeScaling;
 }
 
 parameter_types! {
@@ -128,7 +129,7 @@ cf_test_utilities::impl_test_helpers! {
 	Test,
 	RuntimeGenesisConfig {
 		system: Default::default(),
-		flip: FlipConfig { total_issuance: 1_000, daily_slashing_rate: Permill::from_perthousand(1) },
+		flip: FlipConfig { total_issuance: 1_000, daily_slashing_rate: Permill::from_perthousand(1), scaling_config: crate::ScalingConfig::DelayedExponential { count: 3, base: 1 } },
 		transaction_payment: Default::default(),
 	},
 	|| {

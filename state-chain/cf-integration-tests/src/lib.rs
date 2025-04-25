@@ -33,6 +33,8 @@ mod swapping;
 mod trading_strategy;
 mod witnessing;
 
+mod fee_scaling;
+
 use cf_chains::{
 	eth::Address as EthereumAddress, evm::EvmTransactionMetadata, TransactionMetadata,
 };

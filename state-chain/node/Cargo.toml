@@ -30,6 +30,7 @@ cf-primitives = { workspace = true, default-features = true }
 custom-rpc = { workspace = true }
 cf-utilities = { workspace = true, default-features = true }
 sol-prim = { workspace = true, default-features = true }
+pallet-cf-flip = { workspace = true, default-features = true }
 
 # Added by Chainflip
 hex = { workspace = true, default-features = true }

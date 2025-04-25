@@ -18,6 +18,7 @@ use cf_primitives::AuthorityCount;
 use sp_runtime::{Percent, Permill};
 pub use state_chain_runtime::constants::common::*;
 use state_chain_runtime::{chainflip::Offence, BlockNumber, FlipBalance, SetSizeParameters};
+use pallet_cf_flip::ScalingConfig;
 
 pub const GENESIS_FUNDING_AMOUNT: FlipBalance = 5_000 * FLIPPERINOS_PER_FLIP;
 pub const MIN_FUNDING: FlipBalance = 10 * FLIPPERINOS_PER_FLIP;
@@ -89,6 +90,7 @@ pub const PENALTIES: &[(Offence, (i32, BlockNumber))] = &[
 
 /// Daily slashing rate 0.1% (of the bond) for offline authority
 pub const DAILY_SLASHING_RATE: Permill = Permill::from_perthousand(1);
+pub const SCALING_CONFIG: ScalingConfig = ScalingConfig::DelayedExponential{count: 3, base: 1};
 
 /// Redemption delay on testnets is 2 MINUTES.
 /// We use a ttl of 1 hour to give enough of a buffer.

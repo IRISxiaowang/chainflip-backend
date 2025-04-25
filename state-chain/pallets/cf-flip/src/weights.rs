@@ -49,6 +49,7 @@ use core::marker::PhantomData;
 pub trait WeightInfo {
 	fn set_slashing_rate() -> Weight;
 	fn reap_one_account() -> Weight;
+	fn set_fee_scaling_config() -> Weight;
 }
 
 /// Weights for pallet_cf_flip using the Substrate node and recommended hardware.
@@ -77,6 +78,13 @@ impl<T: frame_system::Config> WeightInfo for PalletWeight<T> {
 			.saturating_add(T::DbWeight::get().reads(2_u64))
 			.saturating_add(T::DbWeight::get().writes(2_u64))
 	}
+
+	fn set_fee_scaling_config() -> Weight {
+		Weight::from_parts(18_272_000, 3545)
+			.saturating_add(T::DbWeight::get().reads(2_u64))
+			.saturating_add(T::DbWeight::get().writes(2_u64))
+	}
+
 }
 
 // For backwards compatibility and tests
@@ -103,5 +111,9 @@ impl WeightInfo for () {
 		Weight::from_parts(18_272_000, 3545)
 			.saturating_add(ParityDbWeight::get().reads(2_u64))
 			.saturating_add(ParityDbWeight::get().writes(2_u64))
+	}
+
+	fn set_fee_scaling_config() -> Weight {
+		Weight::from_parts(18_272_000, 3545)
 	}
 }

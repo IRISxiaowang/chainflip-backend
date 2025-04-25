@@ -57,5 +57,19 @@ mod benchmarks {
 		assert!(!Account::<T>::contains_key(&caller));
 	}
 
+	#[benchmark]
+	fn set_fee_scaling_config() {
+		let config = ScalingConfig {count: 3, base: 1};
+		let call = Call::<T>::set_fee_scaling_config { config };
+		let origin = T::EnsureGovernance::try_successful_origin().unwrap();
+
+		#[block]
+		{
+			assert_ok!(call.dispatch_bypass_filter(origin));
+		}
+
+		assert_eq!(Pallet::<T>::fee_scaling_config(), config)
+	}
+
 	impl_benchmark_test_suite!(Pallet, crate::mock::new_test_ext(), crate::mock::Test);
 }

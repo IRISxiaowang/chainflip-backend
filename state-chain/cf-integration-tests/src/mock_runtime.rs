@@ -167,6 +167,7 @@ impl ExtBuilder {
 			flip: FlipConfig {
 				total_issuance: TOTAL_ISSUANCE,
 				daily_slashing_rate: Permill::from_perthousand(1),
+				scaling_config: pallet_cf_flip::ScalingConfig::DelayedExponential { count: 3, base: 1 },
 			},
 			funding: FundingConfig {
 				genesis_accounts: self

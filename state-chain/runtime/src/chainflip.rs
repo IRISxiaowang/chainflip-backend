@@ -89,7 +89,7 @@ use cf_traits::{
 	BroadcastAnyChainGovKey, Broadcaster, Chainflip, CommKeyBroadcaster, DepositApi, EgressApi,
 	EpochInfo, FetchesTransfersLimitProvider, Heartbeat, IngressEgressFeeApi, Issuance,
 	KeyProvider, OnBroadcastReady, OnDeposit, QualifyNode, RewardsDistribution, RuntimeUpgrade,
-	ScheduledEgressDetails,
+	ScheduledEgressDetails, ScalableFeeManager,
 };
 
 use cf_chains::{btc::ScriptPubkey, instances::BitcoinInstance, sol::api::SolanaTransactionType};
@@ -1021,6 +1021,19 @@ impl cf_traits::MinimumDeposit for MinimumDepositProvider {
 				MinimumDeposit::<Runtime, ArbitrumInstance>::get(asset),
 			ForeignChainAndAsset::Solana(asset) =>
 				MinimumDeposit::<Runtime, SolanaInstance>::get(asset).into(),
+		}
+	}
+}
+
+pub struct CfScalableFeeManager;
+impl ScalableFeeManager<RuntimeCall> for CfScalableFeeManager {
+	fn should_scale_fee(call: &RuntimeCall) -> bool {
+		match call {
+			RuntimeCall::LiquidityPools(pallet_cf_pools::Call::<Runtime>::set_range_order { base_asset: _, quote_asset: _, id: _, option_tick_range: _, size: _ }) => true,
+			RuntimeCall::LiquidityPools(pallet_cf_pools::Call::<Runtime>::update_range_order { base_asset: _, quote_asset: _, id: _, option_tick_range: _, size_change: _ }) => true,
+			RuntimeCall::LiquidityPools(pallet_cf_pools::Call::<Runtime>::set_limit_order { base_asset: _, quote_asset: _, side: _, id: _, option_tick: _, sell_amount: _ }) => true,
+			RuntimeCall::LiquidityPools(pallet_cf_pools::Call::<Runtime>::update_limit_order { base_asset: _, quote_asset: _, side: _, id: _, option_tick: _, amount_change: _ }) => true,
+			_ => false,
 		}
 	}
 }

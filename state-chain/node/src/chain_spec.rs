@@ -31,6 +31,7 @@ use cf_primitives::{
 	DEFAULT_MAX_AUTHORITY_SET_CONTRACTION,
 };
 use common::FLIPPERINOS_PER_FLIP;
+use pallet_cf_flip::ScalingConfig;
 pub use sc_service::{ChainType, Properties};
 use sc_telemetry::serde_json::json;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
@@ -383,6 +384,7 @@ pub fn inner_cf_development_config(
 			ethereum_deployment_block,
 			devnet::TOTAL_ISSUANCE,
 			common::DAILY_SLASHING_RATE,
+			common::SCALING_CONFIG,
 			genesis_funding_amount,
 			min_funding,
 			devnet::REDEMPTION_TAX,
@@ -556,6 +558,7 @@ macro_rules! network_spec {
 						ethereum_deployment_block,
 						TOTAL_ISSUANCE,
 						DAILY_SLASHING_RATE,
+						SCALING_CONFIG,
 						genesis_funding_amount,
 						min_funding,
 						REDEMPTION_TAX,
@@ -614,6 +617,7 @@ fn testnet_genesis(
 	ethereum_deployment_block: u64,
 	total_issuance: FlipBalance,
 	daily_slashing_rate: Permill,
+	scaling_config: ScalingConfig,
 	genesis_funding_amount: u128,
 	minimum_funding: u128,
 	redemption_tax: u128,
@@ -751,7 +755,7 @@ fn testnet_genesis(
 				.map(|x| (x.0.clone(), x.0.clone(), session_keys(x.1.clone(), x.2.clone())))
 				.collect::<Vec<_>>(),
 		},
-		flip: state_chain_runtime::FlipConfig { total_issuance, daily_slashing_rate },
+		flip: state_chain_runtime::FlipConfig { total_issuance, daily_slashing_rate, scaling_config },
 		funding: state_chain_runtime::FundingConfig {
 			genesis_accounts: Vec::from_iter(all_accounts.clone())
 				.into_iter()

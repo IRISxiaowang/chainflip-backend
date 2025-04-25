@@ -1227,3 +1227,14 @@ pub trait MinimumDeposit {
 pub trait LpOrdersWeightsProvider {
 	fn update_limit_order_weight() -> Weight;
 }
+
+pub trait ScalableFeeManager<RuntimeCall> {
+	fn should_scale_fee(call: &RuntimeCall) -> bool;
+}
+
+pub struct NoFeeScaling;
+impl<RuntimeCall> ScalableFeeManager<RuntimeCall> for NoFeeScaling {
+	fn should_scale_fee(_call: &RuntimeCall) -> bool {
+		false
+	}
+}

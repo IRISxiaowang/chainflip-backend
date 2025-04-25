@@ -102,7 +102,7 @@ use pallet_cf_swapping::{
 use pallet_cf_trading_strategy::TradingStrategyDeregistrationCheck;
 use runtime_apis::ChainAccounts;
 
-use crate::{chainflip::EvmLimit, runtime_apis::TransactionScreeningEvent};
+use crate::{chainflip::{EvmLimit, CfScalableFeeManager}, runtime_apis::TransactionScreeningEvent};
 
 use pallet_cf_reputation::{ExclusionList, HeartbeatQualification, ReputationPointsQualification};
 use pallet_cf_swapping::SwapLegInfo;
@@ -163,7 +163,7 @@ pub use cf_primitives::{
 };
 pub use cf_traits::{
 	AccountInfo, BoostApi, Chainflip, EpochInfo, PoolApi, QualifyNode, SessionKeysRegistered,
-	SwappingApi,
+	SwappingApi, ScalableFeeManager,
 };
 // Required for genesis config.
 pub use pallet_cf_validator::SetSizeParameters;
@@ -702,6 +702,7 @@ impl pallet_cf_flip::Config for Runtime {
 	type OnAccountFunded = pallet_cf_validator::UpdateBackupMapping<Self>;
 	type WeightInfo = pallet_cf_flip::weights::PalletWeight<Runtime>;
 	type WaivedFees = chainflip::WaivedFees;
+	type ScalableFeeManager = CfScalableFeeManager;
 }
 
 impl pallet_cf_witnesser::Config for Runtime {

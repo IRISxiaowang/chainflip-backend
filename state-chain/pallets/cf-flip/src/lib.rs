@@ -29,10 +29,11 @@ mod on_charge_transaction;
 pub mod weights;
 use cf_primitives::FlipBalance;
 use scale_info::TypeInfo;
+use serde::{Deserialize, Serialize};
 pub use weights::WeightInfo;
 
 use cf_traits::{
-	AccountInfo, Bonding, DeregistrationCheck, FeePayment, FundingInfo, OnAccountFunded, Slashing,
+	AccountInfo, Bonding, DeregistrationCheck, FeePayment, FundingInfo, OnAccountFunded, ScalableFeeManager, Slashing
 };
 pub use imbalances::{Deficit, ImbalanceSource, InternalSource, Surplus};
 pub use on_charge_transaction::FlipTransactionPayment;
@@ -52,8 +53,41 @@ use frame_support::{
 };
 use frame_system::pallet_prelude::*;
 use sp_std::{fmt::Debug, marker::PhantomData, prelude::*};
-
 pub use pallet::*;
+
+#[derive(
+	Encode,
+	Decode,
+	Copy,
+	Clone,
+	PartialEq,
+	Eq,
+	MaxEncodedLen,
+	RuntimeDebug,
+	TypeInfo,
+	Default,
+	Serialize,
+	Deserialize,
+)]
+pub enum ScalingConfig {
+	DelayedExponential {count: u32, base: u8},
+	#[default]
+	NoFeeScaling,
+}
+impl ScalingConfig {
+	pub fn multiply_call_count(&self, call_count: u32) -> u32 {
+		match self {
+			ScalingConfig::DelayedExponential { count, base } => {
+				if call_count <= *count {
+					1
+				}else {
+					call_count.saturating_sub(*count).saturating_pow((*base).into())
+				}
+			},
+			ScalingConfig::NoFeeScaling => 1,
+		}
+	}
+}
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -95,6 +129,8 @@ pub mod pallet {
 			AccountId = Self::AccountId,
 			RuntimeCall = <Self as frame_system::Config>::RuntimeCall,
 		>;
+
+		type ScalableFeeManager: ScalableFeeManager<<Self as frame_system::Config>::RuntimeCall>;
 	}
 
 	#[pallet::pallet]
@@ -132,6 +168,16 @@ pub mod pallet {
 	#[pallet::getter(fn offchain_funds)]
 	pub type OffchainFunds<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
 
+	/// The number of times the account call the specific extrinsic.
+	#[pallet::storage]
+	#[pallet::getter(fn lp_order_call_count)]
+	pub type LPOrderCallCount<T: Config> = StorageMap<_, Blake2_128Concat, T::AccountId, u32, ValueQuery>;
+
+	/// The baseline for regulating fee scaling.
+	#[pallet::storage]
+	#[pallet::getter(fn fee_scaling_config)]
+	pub type FeeScalingConfig<T: Config> = StorageValue<_, ScalingConfig, ValueQuery>;
+	
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
@@ -151,6 +197,9 @@ pub mod pallet {
 		SlashingRateUpdated {
 			slashing_rate: Permill,
 		},
+		FeeScalingConfigUpdated {
+			config: ScalingConfig,
+		},
 	}
 
 	#[pallet::error]
@@ -163,6 +212,13 @@ pub mod pallet {
 		NoPendingRedemptionForThisID,
 		/// Account is bonded.
 		AccountBonded,
+	}
+
+	#[pallet::hooks]
+	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+		fn on_finalize(_block_number: BlockNumberFor<T>) {
+			let _ = LPOrderCallCount::<T>::clear(u32::MAX, None);
+		}
 	}
 
 	#[pallet::call]
@@ -192,18 +248,32 @@ pub mod pallet {
 			Self::deposit_event(Event::SlashingRateUpdated { slashing_rate });
 			Ok(())
 		}
+
+		#[pallet::call_index(1)]
+		#[pallet::weight(T::WeightInfo::set_fee_scaling_config())]
+		pub fn set_fee_scaling_config(
+			origin: OriginFor<T>,
+			config: ScalingConfig,
+		) -> DispatchResult {
+			T::EnsureGovernance::ensure_origin(origin)?;
+			FeeScalingConfig::<T>::put(config);
+			Self::deposit_event(Event::FeeScalingConfigUpdated { config });
+			Ok(())
+		}
 	}
 
 	#[pallet::genesis_config]
 	pub struct GenesisConfig<T: Config> {
 		pub total_issuance: T::Balance,
 		pub daily_slashing_rate: Permill,
+		pub scaling_config: ScalingConfig,
 	}
 
 	impl<T: Config> Default for GenesisConfig<T> {
 		fn default() -> Self {
 			use frame_support::sp_runtime::traits::Zero;
-			Self { total_issuance: Zero::zero(), daily_slashing_rate: Permill::zero() }
+			Self { total_issuance: Zero::zero(), daily_slashing_rate: Permill::zero(), 
+			scaling_config: ScalingConfig::DelayedExponential {count: 3, base: 1} }
 		}
 	}
 
@@ -213,6 +283,7 @@ pub mod pallet {
 			TotalIssuance::<T>::set(self.total_issuance);
 			OffchainFunds::<T>::set(self.total_issuance);
 			SlashingRate::<T>::set(self.daily_slashing_rate);
+			FeeScalingConfig::<T>::set(self.scaling_config);
 		}
 	}
 }

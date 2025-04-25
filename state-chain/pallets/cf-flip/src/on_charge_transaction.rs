@@ -19,8 +19,8 @@
 //! The Chainflip network is permissioned and as such the main reasons for fees are (a) to encourage
 //! 'good' behaviour and (b) to ensure that only funded actors can submit extrinsics to the network.
 
-use crate::{imbalances::Surplus, Config as FlipConfig, Pallet as Flip};
-use cf_traits::WaivedFees;
+use crate::{imbalances::Surplus, Config as FlipConfig, LPOrderCallCount, Pallet as Flip, FeeScalingConfig};
+use cf_traits::{WaivedFees, ScalableFeeManager};
 use frame_support::{
 	pallet_prelude::InvalidTransaction,
 	sp_runtime::traits::{DispatchInfoOf, Zero},
@@ -28,6 +28,7 @@ use frame_support::{
 };
 use frame_system::Config;
 use pallet_transaction_payment::{Config as TxConfig, OnChargeTransaction};
+use sp_runtime::traits::Saturating;
 use sp_std::marker::PhantomData;
 
 /// Marker struct for implementation of [OnChargeTransaction].
@@ -39,7 +40,7 @@ pub struct FlipTransactionPayment<T>(PhantomData<T>);
 
 impl<T: TxConfig + FlipConfig + Config> OnChargeTransaction<T> for FlipTransactionPayment<T> {
 	type Balance = <T as FlipConfig>::Balance;
-	type LiquidityInfo = Option<Surplus<T>>;
+	type LiquidityInfo = Option<(Surplus<T>, bool)>;
 
 	fn withdraw_fee(
 		who: &T::AccountId,
@@ -51,11 +52,16 @@ impl<T: TxConfig + FlipConfig + Config> OnChargeTransaction<T> for FlipTransacti
 		if T::WaivedFees::should_waive_fees(call, who) {
 			return Ok(None)
 		}
-		if let Some(surplus) = Flip::<T>::try_debit(who, fee) {
+		let mut final_fee = fee;
+		let should_scale_fee = T::ScalableFeeManager::should_scale_fee(call);
+		if should_scale_fee {
+			final_fee = 10u128.pow(18).into();
+		}
+		if let Some(surplus) = Flip::<T>::try_debit(who, final_fee) {
 			if surplus.peek().is_zero() {
 				Ok(None)
 			} else {
-				Ok(Some(surplus))
+				Ok(Some((surplus, should_scale_fee)))
 			}
 		} else {
 			Err(InvalidTransaction::Payment.into())
@@ -74,11 +80,20 @@ impl<T: TxConfig + FlipConfig + Config> OnChargeTransaction<T> for FlipTransacti
 		_tip: Self::Balance,
 		escrow: Self::LiquidityInfo,
 	) -> Result<(), frame_support::unsigned::TransactionValidityError> {
-		if let Some(surplus) = escrow {
+		if let Some((surplus, should_scale_fee)) = escrow {
+			let mut final_corrected_fee = corrected_fee;
+			if should_scale_fee {
+				let user_call_count = LPOrderCallCount::<T>::get(who).max(1);
+				let fee_scaling = FeeScalingConfig::<T>::get();	
+
+				final_corrected_fee = corrected_fee.saturating_mul((fee_scaling.multiply_call_count(user_call_count)).into());
+
+				LPOrderCallCount::<T>::insert(who, user_call_count.saturating_add(1));
+			}
 			// It's possible the account was deleted during extrinsic execution. If this is the
 			// case, we shouldn't refund anything, we can just burn all fees in escrow.
 			let to_burn = if frame_system::Pallet::<T>::account_exists(who) {
-				corrected_fee
+				final_corrected_fee
 			} else {
 				surplus.peek()
 			};
