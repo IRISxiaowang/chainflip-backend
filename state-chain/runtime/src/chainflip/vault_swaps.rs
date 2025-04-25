@@ -128,85 +128,27 @@ pub fn evm_vault_swap<A>(
 	dca_parameters: Option<DcaParameters>,
 	channel_metadata: Option<cf_chains::CcmChannelMetadata>,
 ) -> Result<VaultSwapDetails<A>, DispatchErrorWithMessage> {
-	let refund_params = refund_params.try_map_address(|addr| {
-		Ok::<_, DispatchErrorWithMessage>(
-			ChainAddressConverter::try_from_encoded_address(addr)
-				.and_then(|addr| addr.try_into().map_err(|_| ()))
-				.map_err(|_| "Invalid refund address")?,
-		)
-	})?;
-	let processed_affiliate_fees = to_affiliate_and_fees(&broker_id, affiliate_fees)?
-		.try_into()
-		.map_err(|_| "Too many affiliates.")?;
+	// map the refund parameter
 
-	let cf_parameters = match ForeignChain::from(source_asset) {
-		ForeignChain::Ethereum => build_cf_parameters::<Ethereum>,
-		ForeignChain::Arbitrum => build_cf_parameters::<Arbitrum>,
-		_ => Err(DispatchErrorWithMessage::from("Unsupported source chain for EVM vault swap"))?,
-	}(
-		refund_params,
-		dca_parameters,
-		boost_fee,
-		broker_id,
-		broker_commission,
-		processed_affiliate_fees,
-		channel_metadata.as_ref(),
-	);
+	// Map the affiliates
+
+	// encode cf_parameters
 
 	let calldata = match source_asset {
 		Asset::Eth | Asset::ArbEth =>
 			if let Some(ccm) = channel_metadata {
-				Ok(cf_chains::evm::api::x_call_native::XCallNative::new(
-					destination_address,
-					destination_asset,
-					ccm.message.to_vec(),
-					ccm.gas_budget,
-					cf_parameters,
-				)
-				.abi_encoded_payload())
+				todo!("Native Eth + CCM = XCallNative")
 			} else {
-				Ok(cf_chains::evm::api::x_swap_native::XSwapNative::new(
-					destination_address,
-					destination_asset,
-					cf_parameters,
-				)
-				.abi_encoded_payload())
+				todo!("Native Eth + no CCM = XSwapNative")
 			},
 		Asset::Flip | Asset::Usdc | Asset::Usdt | Asset::ArbUsdc => {
 			// Lookup Token addresses depending on the Chain
-			let source_token_address = match source_asset {
-				Asset::Flip | Asset::Usdc | Asset::Usdt =>
-					<EvmEnvironment as EvmEnvironmentProvider<Ethereum>>::token_address(
-						source_asset.try_into().expect("Only Ethereum asset is processed here"),
-					),
-				Asset::ArbUsdc =>
-					<EvmEnvironment as EvmEnvironmentProvider<Arbitrum>>::token_address(
-						cf_chains::assets::arb::Asset::ArbUsdc,
-					),
-				_ => unreachable!("Unreachable for non-Ethereum/Arbitrum assets"),
-			}
-			.ok_or(DispatchErrorWithMessage::from("Failed to look up EVM token address"))?;
-
+			
+			// Create the encoded ApiCall
 			if let Some(ccm) = channel_metadata {
-				Ok(cf_chains::evm::api::x_call_token::XCallToken::new(
-					destination_address,
-					destination_asset,
-					ccm.message.to_vec(),
-					ccm.gas_budget,
-					source_token_address,
-					amount,
-					cf_parameters,
-				)
-				.abi_encoded_payload())
+				todo!("Token + CCM = XCallToken")
 			} else {
-				Ok(cf_chains::evm::api::x_swap_token::XSwapToken::new(
-					destination_address,
-					destination_asset,
-					source_token_address,
-					amount,
-					cf_parameters,
-				)
-				.abi_encoded_payload())
+				todo!("Token + no CCM = XSwapToken")
 			}
 		},
 		_ => Err(DispatchErrorWithMessage::from(
@@ -214,25 +156,7 @@ pub fn evm_vault_swap<A>(
 		)),
 	}?;
 
-	match source_asset.into() {
-		ForeignChain::Ethereum => Ok(VaultSwapDetails::ethereum(EvmVaultSwapDetails {
-			calldata,
-			// Only return `amount` for native currently. 0 for Tokens
-			value: (source_asset == Asset::Eth).then_some(U256::from(amount)).unwrap_or_default(),
-			to: Environment::eth_vault_address(),
-		})),
-		ForeignChain::Arbitrum => Ok(VaultSwapDetails::arbitrum(EvmVaultSwapDetails {
-			calldata,
-			// Only return `amount` for native currently. 0 for Tokens
-			value: (source_asset == Asset::ArbEth)
-				.then_some(U256::from(amount))
-				.unwrap_or_default(),
-			to: Environment::arb_vault_address(),
-		})),
-		_ => Err(DispatchErrorWithMessage::from(
-			"Only EVM chains should execute this branch of logic. This error should never happen",
-		)),
-	}
+	todo!("Finalize the call into `VaultSwapDetails` depending on the source chain (Ethereum/Arbitrum)")
 }
 
 pub fn solana_vault_swap<A>(
@@ -252,91 +176,28 @@ pub fn solana_vault_swap<A>(
 	from_token_account: Option<EncodedAddress>,
 ) -> Result<VaultSwapDetails<A>, DispatchErrorWithMessage> {
 	// Load up environment variables.
-	let api_environment =
-		SolEnvironment::api_environment().map_err(|_| "Failed to load Solana API environment")?;
 
-	let swap_endpoint_native_vault =
-		cf_chains::sol::sol_tx_core::address_derivation::derive_swap_endpoint_native_vault_account(
-			api_environment.swap_endpoint_program,
-		)
-		.map_err(|_| "Failed to derive swap_endpoint_native_vault")?
-		.address;
+	// Derive `swap_endpoint_native_vault`
+	
+	// map the affiliate fees
 
-	let processed_affiliate_fees = to_affiliate_and_fees(&broker_id, affiliate_fees)?
-		.try_into()
-		.map_err(|_| "Too many affiliates")?;
+	// Map the refund parameters
 
-	let from = SolPubkey::try_from(from).map_err(|_| "Invalid Solana Address: from")?;
-	let refund_parameters = refund_parameters.try_map_address(|addr| {
-		Ok::<_, DispatchErrorWithMessage>(
-			ChainAddressConverter::try_from_encoded_address(addr)
-				.and_then(|addr| addr.try_into().map_err(|_| ()))
-				.map_err(|_| "Invalid refund address")?,
-		)
-	})?;
-	let event_data_account = SolPubkey::try_from(event_data_account)
-		.map_err(|_| "Invalid Solana Address: event_data_account")?;
-	let input_amount =
-		SolAmount::try_from(input_amount).map_err(|_| "Input amount exceeded MAX")?;
-	let cf_parameters = build_cf_parameters::<Solana>(
-		refund_parameters,
-		dca_parameters,
-		boost_fee,
-		broker_id,
-		broker_commission,
-		processed_affiliate_fees,
-		channel_metadata.as_ref(),
-	);
+	// Encode the cf_parameters
 
-	Ok(VaultSwapDetails::Solana {
-		instruction: match source_asset {
-			Asset::Sol => SolanaInstructionBuilder::x_swap_native(
-				api_environment,
-				swap_endpoint_native_vault.into(),
-				destination_asset,
-				destination_address,
-				from,
-				event_data_account,
-				input_amount,
-				cf_parameters,
-				channel_metadata,
-			),
-			Asset::SolUsdc => {
-				let token_supported_account =
-						cf_chains::sol::sol_tx_core::address_derivation::derive_token_supported_account(
-							api_environment.vault_program,
-							api_environment.usdc_token_mint_pubkey,
-						)
-						.map_err(|_| "Failed to derive supported token account")?;
+	// Create the encoded call
+	// let instruction = 
+	match source_asset {
+		Asset::Sol => todo!("Create the Instruction using the SolanaInstructionBuilder"),
+		Asset::SolUsdc => {
+			// Derive the `token_supported_account`
+			
+			// Derive the `from_token_account` if not supplied
 
-				let from_token_account = match from_token_account {
-					Some(token_account) => SolPubkey::try_from(token_account)
-						.map_err(|_| "Failed to decode the source token account")?,
-					// Defaulting to the user's associated token account
-					None => derive_associated_token_account(
-						from.into(),
-						api_environment.usdc_token_mint_pubkey,
-					)
-					.map_err(|_| "Failed to derive the associated token account")?
-					.address
-					.into(),
-				};
+			todo!("Create the Instruction using the SolanaInstructionBuilder")
+		},
+		_ => {} //Err("Invalid source_asset: Not a Solana asset."),
+	};
 
-				SolanaInstructionBuilder::x_swap_usdc(
-					api_environment,
-					destination_asset,
-					destination_address,
-					from,
-					from_token_account,
-					event_data_account,
-					token_supported_account.address.into(),
-					input_amount,
-					cf_parameters,
-					channel_metadata,
-				)
-			},
-			_ => Err("Invalid source_asset: Not a Solana asset.")?,
-		}
-		.into(),
-	})
+	todo!("Create the final VaultSwapDetails")
 }

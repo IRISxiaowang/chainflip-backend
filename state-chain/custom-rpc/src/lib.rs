@@ -935,22 +935,6 @@ pub trait CustomApi {
 		at: Option<state_chain_runtime::Hash>,
 	) -> RpcResult<()>;
 
-	#[method(name = "request_swap_parameter_encoding")]
-	fn cf_request_swap_parameter_encoding(
-		&self,
-		broker: state_chain_runtime::AccountId,
-		source_asset: Asset,
-		destination_asset: Asset,
-		destination_address: AddressString,
-		broker_commission: BasisPoints,
-		extra_parameters: VaultSwapExtraParametersRpc,
-		channel_metadata: Option<CcmChannelMetadata>,
-		boost_fee: Option<BasisPoints>,
-		affiliate_fees: Option<Affiliates<state_chain_runtime::AccountId>>,
-		dca_parameters: Option<DcaParameters>,
-		at: Option<state_chain_runtime::Hash>,
-	) -> RpcResult<VaultSwapDetails<AddressString>>;
-
 	#[method(name = "get_open_deposit_channels")]
 	fn cf_get_open_deposit_channels(
 		&self,
@@ -1789,40 +1773,6 @@ where
 	) -> RpcResult<Vec<u8>> {
 		self.rpc_backend
 			.with_runtime_api(at, |api, hash| api.cf_filter_votes(hash, validator, proposed_votes))
-	}
-
-	fn cf_request_swap_parameter_encoding(
-		&self,
-		broker: state_chain_runtime::AccountId,
-		source_asset: Asset,
-		destination_asset: Asset,
-		destination_address: AddressString,
-		broker_commission: BasisPoints,
-		extra_parameters: VaultSwapExtraParametersRpc,
-		channel_metadata: Option<CcmChannelMetadata>,
-		boost_fee: Option<BasisPoints>,
-		affiliate_fees: Option<Affiliates<state_chain_runtime::AccountId>>,
-		dca_parameters: Option<DcaParameters>,
-		at: Option<state_chain_runtime::Hash>,
-	) -> RpcResult<VaultSwapDetails<AddressString>> {
-		self.rpc_backend.with_runtime_api(at, |api, hash| {
-			Ok::<_, CfApiError>(
-				api.cf_request_swap_parameter_encoding(
-					hash,
-					broker,
-					source_asset,
-					destination_asset,
-					destination_address.try_parse_to_encoded_address(destination_asset.into())?,
-					broker_commission,
-					extra_parameters.try_into_encoded_params(source_asset.into())?,
-					channel_metadata,
-					boost_fee.unwrap_or_default(),
-					affiliate_fees.unwrap_or_default(),
-					dca_parameters,
-				)??
-				.map_btc_address(Into::into),
-			)
-		})
 	}
 
 	fn cf_get_transaction_screening_events(

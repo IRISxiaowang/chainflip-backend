@@ -15,9 +15,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod x_call_native;
-pub mod x_call_token;
-pub mod x_swap_native;
-pub mod x_swap_token;
+// pub mod x_call_token;
+// pub mod x_swap_native;
+// pub mod x_swap_token;
 
 /// Some test values and utility functions used within the Vault swap call module.
 #[cfg(test)]

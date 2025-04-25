@@ -118,20 +118,6 @@ pub trait Rpc {
 		destination_address: AddressString,
 	) -> RpcResult<WithdrawFeesDetail>;
 
-	#[method(name = "request_swap_parameter_encoding", aliases = ["broker_requestSwapParameterEncoding"])]
-	async fn request_swap_parameter_encoding(
-		&self,
-		source_asset: Asset,
-		destination_asset: Asset,
-		destination_address: AddressString,
-		broker_commission: BasisPoints,
-		extra_parameters: VaultSwapExtraParametersRpc,
-		channel_metadata: Option<CcmChannelMetadata>,
-		boost_fee: Option<BasisPoints>,
-		affiliate_fees: Option<Affiliates<AccountId32>>,
-		dca_parameters: Option<DcaParameters>,
-	) -> RpcResult<VaultSwapDetails<AddressString>>;
-
 	#[method(name = "mark_transaction_for_rejection", aliases = ["broker_MarkTransactionForRejection"])]
 	async fn mark_transaction_for_rejection(&self, tx_id: TransactionInId) -> RpcResult<()>;
 
@@ -234,37 +220,6 @@ impl RpcServer for RpcServerImpl {
 		destination_address: AddressString,
 	) -> RpcResult<WithdrawFeesDetail> {
 		Ok(self.api.broker_api().withdraw_fees(asset, destination_address).await?)
-	}
-
-	async fn request_swap_parameter_encoding(
-		&self,
-		source_asset: Asset,
-		destination_asset: Asset,
-		destination_address: AddressString,
-		broker_commission: BasisPoints,
-		extra_parameters: VaultSwapExtraParametersRpc,
-		channel_metadata: Option<CcmChannelMetadata>,
-		boost_fee: Option<BasisPoints>,
-		affiliate_fees: Option<Affiliates<AccountId32>>,
-		dca_parameters: Option<DcaParameters>,
-	) -> RpcResult<VaultSwapDetails<AddressString>> {
-		Ok(self
-			.api
-			.raw_client()
-			.cf_request_swap_parameter_encoding(
-				self.api.state_chain_client.account_id(),
-				source_asset,
-				destination_asset,
-				destination_address,
-				broker_commission,
-				extra_parameters,
-				channel_metadata,
-				boost_fee,
-				affiliate_fees,
-				dca_parameters,
-				None,
-			)
-			.await?)
 	}
 
 	async fn mark_transaction_for_rejection(&self, tx_id: TransactionInId) -> RpcResult<()> {

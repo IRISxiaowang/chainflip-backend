@@ -2190,68 +2190,36 @@ impl_runtime_apis! {
 			affiliate_fees: Affiliates<AccountId>,
 			dca_parameters: Option<DcaParameters>,
 		) -> Result<VaultSwapDetails<String>, DispatchErrorWithMessage> {
-			let source_chain = ForeignChain::from(source_asset);
-			let destination_chain = ForeignChain::from(destination_asset);
+			// Get the source chain
+			let source_chain = ForeignChain::Ethereum;
 
-			// Validate parameters.
-			if let Some(params) = dca_parameters.as_ref() {
-				pallet_cf_swapping::Pallet::<Runtime>::validate_dca_params(params)?;
-			}
-			// Conversion implicitly verifies address validity.
-			frame_support::ensure!(
-				ChainAddressConverter::try_from_encoded_address(destination_address.clone())
-					.map_err(|_| pallet_cf_swapping::Error::<Runtime>::InvalidDestinationAddress)?
-					.chain() == destination_chain
-				,
-				"Destination address and asset are on different chains."
-			);
+			// Validate DCA parameters.
 
-			// Validate boost fee.
-			let boost_fee: u8 = boost_fee
-				.try_into()
-				.map_err(|_| pallet_cf_swapping::Error::<Runtime>::BoostFeeTooHigh)?;
-
+			// `ChainAddressConverter::try_from_encoded_address` verifies address validity.
+			
+			// Validate boost fee (into u8)
+			let boost_fee = 0u8;
+			
 			// Validate refund duration.
-			pallet_cf_swapping::Pallet::<Runtime>::validate_refund_params(match &extra_parameters {
-				VaultSwapExtraParametersEncoded::Bitcoin { retry_duration, .. } => *retry_duration,
-				VaultSwapExtraParametersEncoded::Ethereum(extra_params) => extra_params.refund_parameters.retry_duration,
-				VaultSwapExtraParametersEncoded::Arbitrum(extra_params) => extra_params.refund_parameters.retry_duration,
-				VaultSwapExtraParametersEncoded::Solana { refund_parameters, .. } => refund_parameters.retry_duration,
-			})?;
 
 			// Validate CCM.
 			if let Some(ccm) = channel_metadata.as_ref() {
-				if source_chain == ForeignChain::Bitcoin {
-					return Err(DispatchErrorWithMessage::from("Vault swaps with CCM are not supported for the Bitcoin Chain"));
-				}
-				if !destination_chain.ccm_support() {
-					return Err(DispatchErrorWithMessage::from("Destination chain does not support CCM"));
-				}
+				// if source_chain == ForeignChain::Bitcoin {
+				// 	return Err(DispatchErrorWithMessage::from("Vault swaps with CCM are not supported for the Bitcoin Chain"));
+				// }
+				// if !destination_chain.ccm_support() {
+				// 	return Err(DispatchErrorWithMessage::from("Destination chain does not support CCM"));
+				// }
 
-				// Ensure CCM message is valid
+				// Use `check_and_decode` to check the validity of CCM
 				match CcmValidityChecker::check_and_decode(ccm, destination_asset, destination_address.clone())
 				{
 					Ok(DecodedCcmAdditionalData::Solana(decoded)) => {
 						let ccm_accounts = decoded.ccm_accounts();
 
-						// Ensure the CCM parameters do not contain blacklisted accounts.
-						// Load up environment variables.
-						let api_environment =
-							SolEnvironment::api_environment().map_err(|_| "Failed to load Solana API environment")?;
-
-						let agg_key: SolPubkey = SolEnvironment::current_agg_key()
-							.map_err(|_| "Failed to load Solana Agg key")?
-							.into();
-
-						let on_chain_key: SolPubkey = SolEnvironment::current_on_chain_key()
-							.map(|key| key.into())
-							.unwrap_or_else(|_| agg_key);
-
-						check_ccm_for_blacklisted_accounts(
-							&ccm_accounts,
-							vec![api_environment.token_vault_pda_account.into(), agg_key, on_chain_key],
-						)
-						.map_err(DispatchError::from)?;
+						// Ensure the CCM parameters do not contain blacklisted accounts: (`check_ccm_for_blacklisted_accounts`)
+						// aggkey, on_chain_key, token_vault_pda_account
+						
 					},
 					Ok(DecodedCcmAdditionalData::NotRequired) => {},
 					Err(_) => return Err(DispatchErrorWithMessage::from("Solana Ccm additional data is invalid")),
